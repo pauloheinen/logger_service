@@ -1,25 +1,45 @@
-# Logger Service (Vercel)
+# Meu Auditor Logger (Vercel)
 
-Endpoint receptor de erros do app Flutter.
+Serviço Node.js simples para receber logs de erro de apps e registrar cada request.
 
-## Endpoint
+## Endpoint disponível
 - `POST /api/log`
 
-## Variáveis de ambiente (Vercel)
-- `LOGGER_TOKEN` (opcional, recomendado)
+URL atual em produção:
+- `https://logger-service.vercel.app/api/log`
 
-## Payload
-O app envia JSON com campos como `timestamp`, `error`, `stackTrace`, `context`, etc.
+## Método e resposta
+- Método aceito: `POST`
+- Sucesso: `200 { "ok": true }`
+- Método inválido: `405`
+- JSON inválido: `400`
 
-## Observação de filesystem na Vercel
-- O arquivo `logs/requests.log` existe no repositório para desenvolvimento local.
-- Em runtime serverless, o filesystem do projeto costuma ser somente leitura.
-- Nessa situação, o endpoint tenta gravar em `/tmp/requests.log`.
+## Autenticação no servidor
+- O logger suporta token opcional via `LOGGER_TOKEN`.
+- Se `LOGGER_TOKEN` estiver definido na Vercel, o servidor exige header:
+  - `Authorization: Bearer <token>`
 
-## Como apontar o app
-Exemplo:
-```bash
-flutter run \
-  --dart-define=ERROR_LOG_ENDPOINT=https://SEU-PROJETO.vercel.app/api/log \
-  --dart-define=ERROR_LOG_TOKEN=SEU_TOKEN
-```
+Observação importante do estado atual do app:
+- O app `Meu Auditor` está configurado para enviar sem token.
+- Portanto, para funcionar no estado atual, deixe `LOGGER_TOKEN` **vazio** na Vercel.
+
+## Payload recebido (campos principais)
+- `timestamp`
+- `app`
+- `platform`
+- `platformVersion`
+- `error`
+- `stackTrace`
+- `context`
+- `extra`
+
+## Armazenamento de logs
+- Tenta gravar em `logs/requests.log` (uso local).
+- Em ambiente serverless/read-only, faz fallback para `/tmp/requests.log`.
+
+## Configuração atual no app Flutter
+No estado atual do código do app:
+- Endpoint está hardcoded em `https://logger-service.vercel.app/api/log`.
+- Envio ocorre apenas em release (`kReleaseMode`).
+- Falha no envio é silenciosa (não impacta UX).
+- Timeout de request: até 2 minutos.
