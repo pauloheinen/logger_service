@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/log.js": {
+      "maxDuration": 60
+    }
+  }
+}
