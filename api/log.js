@@ -43,6 +43,7 @@ export default async function handler(req, res) {
     const authHeader = req.headers.authorization || '';
     const expected = `Bearer ${token}`;
     if (authHeader !== expected) {
+      console.warn('[logger] unauthorized request');
       return res.status(401).json({ ok: false, error: 'Unauthorized' });
     }
   }
@@ -52,7 +53,16 @@ export default async function handler(req, res) {
     const raw = await readBody(req);
     payload = JSON.parse(raw || '{}');
   } catch (error) {
-    appendLogLine(`${new Date().toISOString()} | invalid-json | ${String(error)}\n`);
+    const invalidEntry = {
+      receivedAt: new Date().toISOString(),
+      type: 'invalid-json',
+      error: String(error),
+      ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null,
+      userAgent: req.headers['user-agent'] || null,
+    };
+
+    console.error(JSON.stringify(invalidEntry));
+    appendLogLine(`${JSON.stringify(invalidEntry)}\n`);
     return res.status(400).json({ ok: false, error: 'Invalid JSON payload' });
   }
 
@@ -63,6 +73,7 @@ export default async function handler(req, res) {
     payload,
   };
 
+  console.log(JSON.stringify(entry));
   appendLogLine(`${JSON.stringify(entry)}\n`);
 
   return res.status(200).json({ ok: true });
