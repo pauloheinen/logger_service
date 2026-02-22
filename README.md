@@ -1,45 +1,25 @@
-# Meu Auditor Logger (Vercel)
+# Logger Service (Vercel)
 
-Serviço Node.js simples para receber logs de erro de apps e registrar cada request.
+Endpoint receptor de erros do app Flutter.
 
-## Endpoint disponível
+## Endpoints
+- `GET /` (home)
 - `POST /api/log`
+- `GET /status` (alias para `GET /api/status`)
 
-URL atual em produção:
-- `https://logger-service.vercel.app/api/log`
-
-## Método e resposta
-- Método aceito: `POST`
-- Sucesso: `200 { "ok": true }`
-- Método inválido: `405`
-- JSON inválido: `400`
-
-## Autenticação no servidor
-- O logger suporta token opcional via `LOGGER_TOKEN`.
-- Se `LOGGER_TOKEN` estiver definido na Vercel, o servidor exige header:
-  - `Authorization: Bearer <token>`
-
-Observação importante do estado atual do app:
-- O app `Meu Auditor` está configurado para enviar sem token.
-- Portanto, para funcionar no estado atual, deixe `LOGGER_TOKEN` **vazio** na Vercel.
-
-## Payload recebido (campos principais)
-- `timestamp`
-- `app`
-- `platform`
-- `platformVersion`
-- `error`
-- `stackTrace`
-- `context`
-- `extra`
+## Variáveis de ambiente (Vercel)
+- `LOGGER_TOKEN` (opcional, recomendado)
+- `BLOB_READ_WRITE_TOKEN` (necessário para gravar logs no Vercel Blob)
+- `LOGGER_BLOB_PREFIX` (opcional, padrão: `logs`)
 
 ## Armazenamento de logs
-- Tenta gravar em `logs/requests.log` (uso local).
-- Em ambiente serverless/read-only, faz fallback para `/tmp/requests.log`.
+- Cada requisição é gravada como um blob privado (`access: private`) no Vercel Blob.
+- O endpoint cria um arquivo `.json` por evento (request válida ou payload inválido).
+- Estrutura padrão de caminho: `logs/YYYY-MM-DD/...`.
 
-## Configuração atual no app Flutter
-No estado atual do código do app:
-- Endpoint está hardcoded em `https://logger-service.vercel.app/api/log`.
-- Envio ocorre apenas em release (`kReleaseMode`).
-- Falha no envio é silenciosa (não impacta UX).
-- Timeout de request: até 2 minutos.
+## Payload
+O app envia JSON com campos como `timestamp`, `error`, `stackTrace`, `context`, etc.
+
+## Integração com o app
+- O app Flutter deve usar endpoint/token hardcoded (sem `--dart-define` no `flutter run`).
+- Endpoint de envio: `POST /api/log`
