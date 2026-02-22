@@ -31,11 +31,28 @@ function getClientIp(req) {
   return req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
 }
 
-function buildBlobPath(kind, receivedAt) {
+function slugify(value, fallback) {
+  const input = String(value ?? '').trim();
+  if (!input) return fallback;
+
+  const slug = input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+
+  return slug || fallback;
+}
+
+function buildBlobPath(entry, kind) {
   const prefix = (process.env.LOGGER_BLOB_PREFIX || DEFAULT_BLOB_PREFIX).replace(/\/$/, '');
-  const datePart = receivedAt.slice(0, 10);
-  const timestampPart = receivedAt.replace(/[:.]/g, '-');
-  return `${prefix}/${datePart}/${kind}-${timestampPart}-${randomUUID()}.json`;
+  const datePart = entry.receivedAt.slice(0, 10);
+  const projectName = slugify(entry?.payload?.app, 'sem-projeto');
+  const contextName = slugify(entry?.payload?.context, kind);
+  const shortId = randomUUID().split('-')[0];
+  return `${prefix}/${projectName}/${datePart}/${contextName}/${shortId}.json`;
 }
 
 function getBlobToken() {
@@ -48,7 +65,7 @@ async function persistLogEntry(entry, kind) {
     throw new Error('Missing BLOB_READ_WRITE_TOKEN');
   }
 
-  const pathname = buildBlobPath(kind, entry.receivedAt);
+  const pathname = buildBlobPath(entry, kind);
   const { url } = await put(pathname, `${JSON.stringify(entry)}\n`, {
     access: 'private',
     contentType: 'application/json; charset=utf-8',
