@@ -3,7 +3,6 @@ import { put } from '@vercel/blob';
 
 const MAX_BODY_SIZE = 4_500_000;
 const DEFAULT_BLOB_PREFIX = 'logs';
-const BLOB_ACCESS = 'private';
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -51,12 +50,11 @@ async function persistLogEntry(entry, kind) {
 
   const pathname = buildBlobPath(kind, entry.receivedAt);
   const { url } = await put(pathname, `${JSON.stringify(entry)}\n`, {
-    access: BLOB_ACCESS,
     contentType: 'application/json; charset=utf-8',
     token,
   });
 
-  return { pathname, url, access: BLOB_ACCESS };
+  return { pathname, url };
 }
 
 export default async function handler(req, res) {
