@@ -50,6 +50,7 @@ async function persistLogEntry(entry, kind) {
 
   const pathname = buildBlobPath(kind, entry.receivedAt);
   const { url } = await put(pathname, `${JSON.stringify(entry)}\n`, {
+    access: 'private',
     contentType: 'application/json; charset=utf-8',
     token,
   });
