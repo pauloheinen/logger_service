@@ -2,13 +2,26 @@
 
 API simples para receber erros do app Flutter e persistir cada evento no Vercel Blob.
 
-## Endpoint
+## Endpoints
 - `GET /` (home)
 - `POST /api/log`
-- `POST /api/status`
+- `GET /api/status`
 
 URL de produção atual:
 - `https://logger-service.vercel.app/api/log`
+
+## Status remoto por app (feature flag)
+O endpoint de status aceita uma chave por query string:
+- `GET /api/status?key=KEY`
+
+A API valida a chave em allowlist no backend e retorna:
+```json
+{
+  "ok": true,
+  "enabled": true,
+  "envVar": "KEY"
+}
+```
 
 ## Fluxo
 1. O app Flutter envia `POST` para `/api/log`
@@ -19,7 +32,8 @@ URL de produção atual:
 ## Variáveis de ambiente (Vercel)
 - `BLOB_READ_WRITE_TOKEN` (obrigatória para persistência no Blob)
 - `LOGGER_BLOB_PREFIX` (opcional, padrão: `logs`)
-
+- `LOGGER_TOKEN` (opcional; se definido, exige `Authorization: Bearer <token>` no `/api/log`)
+- `AUDITOR_ENABLED` (`true` ou `false`, usado pelo app Meu Auditor)
 
 ## Vercel Blob (store privado)
 - A API grava usando `@vercel/blob` com `access: 'private'`
@@ -51,8 +65,8 @@ O app Flutter envia JSON com campos como:
 
 ## Respostas da API
 - `200` -> log recebido e persistido
-- `400` -> JSON inválido
-- `401` -> não autorizado (somente se `LOGGER_TOKEN` estiver configurado)
+- `400` -> JSON inválido ou status key não permitida
+- `401` -> não autorizado (somente se `LOGGER_TOKEN` estiver configurado em `/api/log`)
 - `405` -> método inválido
 - `500` -> falha ao persistir no Blob
 
@@ -62,6 +76,7 @@ O app Flutter envia JSON com campos como:
 - Em sucesso, procure por: `[logger] blob persisted`
 
 ## Integração com o app (estado atual)
-- O app envia para `https://logger-service.vercel.app/api/log`
-- Envio ocorre apenas em `release` (`kReleaseMode`)
+- O app envia erros para `https://logger-service.vercel.app/api/log`
+- O app consulta status em `https://logger-service.vercel.app/api/status?key=KEY`
+- Envio de erros ocorre apenas em `release` (`kReleaseMode`)
 - Falha de envio é silenciosa (não trava a UI)
