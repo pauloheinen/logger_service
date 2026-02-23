@@ -23,8 +23,9 @@ export default async function handler(req, res) {
   return res.status(200).json({
     ok: true,
     service: 'logger_service',
-    enabled,
-    envVar: requestedKey,
+    status: {
+      [requestedKey]: enabled,
+    },
     timestamp: new Date().toISOString(),
   });
 }
