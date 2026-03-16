@@ -35,6 +35,7 @@ A API valida a chave em allowlist no backend e retorna:
 - `LOGGER_BLOB_PREFIX` (opcional, padrão: `logs`)
 - `LOGGER_TOKEN` (opcional; se definido, exige `Authorization: Bearer <token>` no `/api/log`)
 - `AUDITOR_ENABLED` (`true` ou `false`, usado pelo app Meu Auditor)
+- `KARAT_GESTAO_ENABLED` (`true` ou `false`, usado pelo app Karat Gestao)
 - `LOGGER_ALERT_EMAIL_ENABLED` (`true` por padrão; use `false` para desativar envio de e-mail)
 - `RESEND_API_KEY` (obrigatória para envio de e-mail)
 - `LOGGER_ALERT_FROM_EMAIL` (remetente validado no Resend, ex: `Logger <noreply@teuapp.dev.br>`)

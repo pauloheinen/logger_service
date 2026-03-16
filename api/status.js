@@ -1,5 +1,6 @@
 const STATUS_ENV_ALLOWLIST = new Set([
   'AUDITOR_ENABLED',
+  'KARAT_GESTAO_ENABLED',
 ]);
 
 export default async function handler(req, res) {
