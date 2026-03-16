@@ -1,6 +1,7 @@
 # Meu Auditor Logger (Vercel)
 
 API simples para receber erros do app Flutter e persistir cada evento no Vercel Blob.
+Tambem pode disparar um e-mail simples com assunto de excecao e corpo contendo erro e stack trace.
 
 ## Endpoints
 - `GET /` (home)
@@ -34,6 +35,10 @@ A API valida a chave em allowlist no backend e retorna:
 - `LOGGER_BLOB_PREFIX` (opcional, padrão: `logs`)
 - `LOGGER_TOKEN` (opcional; se definido, exige `Authorization: Bearer <token>` no `/api/log`)
 - `AUDITOR_ENABLED` (`true` ou `false`, usado pelo app Meu Auditor)
+- `LOGGER_ALERT_EMAIL_ENABLED` (`true` por padrão; use `false` para desativar envio de e-mail)
+- `RESEND_API_KEY` (obrigatória para envio de e-mail)
+- `LOGGER_ALERT_FROM_EMAIL` (remetente validado no Resend, ex: `Logger <noreply@teuapp.dev.br>`)
+- `LOGGER_ALERT_TO_EMAIL` (destinatário; padrão: `paulo@teuapp.dev.br`)
 
 ## Vercel Blob (store privado)
 - A API grava usando `@vercel/blob` com `access: 'private'`
@@ -74,9 +79,28 @@ O app Flutter envia JSON com campos como:
 - A API faz `console.log`/`console.error` no runtime da Vercel
 - Use `Functions Logs` na Vercel para depuração
 - Em sucesso, procure por: `[logger] blob persisted`
+- Para e-mail, procure por: `[logger] email result`
 
 ## Integração com o app (estado atual)
 - O app envia erros para `https://logger-service.vercel.app/api/log`
 - O app consulta status em `https://logger-service.vercel.app/api/status?key=KEY`
 - Envio de erros ocorre apenas em `release` (`kReleaseMode`)
 - Falha de envio é silenciosa (não trava a UI)
+
+## Envio de e-mail
+Quando o blob é persistido com sucesso, o handler tenta enviar um e-mail usando a API do Resend.
+
+Assunto:
+- `[{app}] Excecao em {context}`
+
+Corpo:
+- projeto
+- contexto
+- timestamp
+- plataforma
+- ip
+- user-agent
+- blob path/url
+- erro
+- stack trace
+- campo `extra`, quando existir

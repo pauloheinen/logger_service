@@ -3,6 +3,8 @@ import { put } from '@vercel/blob';
 
 const MAX_BODY_SIZE = 4_500_000;
 const DEFAULT_BLOB_PREFIX = 'logs';
+const RESEND_EMAIL_API_URL = 'https://api.resend.com/emails';
+const DEFAULT_ALERT_TO_EMAIL = 'paulo@teuapp.dev.br';
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -59,6 +61,15 @@ function getBlobToken() {
   return process.env.BLOB_READ_WRITE_TOKEN || '';
 }
 
+function getEmailConfig() {
+  return {
+    enabled: process.env.LOGGER_ALERT_EMAIL_ENABLED !== 'false',
+    apiKey: process.env.RESEND_API_KEY || '',
+    from: process.env.LOGGER_ALERT_FROM_EMAIL || '',
+    to: process.env.LOGGER_ALERT_TO_EMAIL || DEFAULT_ALERT_TO_EMAIL,
+  };
+}
+
 async function persistLogEntry(entry, kind) {
   const token = getBlobToken();
   if (!token) {
@@ -73,6 +84,95 @@ async function persistLogEntry(entry, kind) {
   });
 
   return { pathname, url };
+}
+
+function formatValue(value, fallback = '-') {
+  if (value == null) return fallback;
+  if (typeof value === 'string' && value.trim()) return value;
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (_) {
+      return String(value);
+    }
+  }
+
+  return String(value);
+}
+
+function buildEmailSubject(entry) {
+  const app = formatValue(entry?.payload?.app, 'sem-projeto');
+  const context = formatValue(entry?.payload?.context, 'sem-contexto');
+  return `[${app}] Excecao em ${context}`;
+}
+
+function buildEmailBody(entry, blobInfo) {
+  const payload = entry?.payload || {};
+  const lines = [
+    'Uma nova excecao foi registrada pelo logger_service.',
+    '',
+    `Projeto: ${formatValue(payload.app)}`,
+    `Contexto: ${formatValue(payload.context)}`,
+    `Recebido em: ${formatValue(entry.receivedAt)}`,
+    `Plataforma: ${formatValue(payload.platform)}`,
+    `Versao da plataforma: ${formatValue(payload.platformVersion)}`,
+    `IP: ${formatValue(entry.ip)}`,
+    `User-Agent: ${formatValue(entry.userAgent)}`,
+    `Blob path: ${formatValue(blobInfo?.pathname)}`,
+    `Blob url: ${formatValue(blobInfo?.url)}`,
+    '',
+    'Erro:',
+    formatValue(payload.error),
+    '',
+    'Stack trace:',
+    formatValue(payload.stackTrace),
+  ];
+
+  if (payload.extra != null) {
+    lines.push('', 'Extra:', formatValue(payload.extra));
+  }
+
+  return lines.join('\n');
+}
+
+async function sendErrorEmail(entry, blobInfo) {
+  const email = getEmailConfig();
+  if (!email.enabled) {
+    return { sent: false, skipped: 'disabled' };
+  }
+
+  if (!email.apiKey) {
+    console.warn('[logger] email skipped: missing RESEND_API_KEY');
+    return { sent: false, skipped: 'missing-api-key' };
+  }
+
+  if (!email.from) {
+    console.warn('[logger] email skipped: missing LOGGER_ALERT_FROM_EMAIL');
+    return { sent: false, skipped: 'missing-from-email' };
+  }
+
+  const response = await fetch(RESEND_EMAIL_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${email.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: email.from,
+      to: [email.to],
+      subject: buildEmailSubject(entry),
+      text: buildEmailBody(entry, blobInfo),
+    }),
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(
+      `Failed to send email (${response.status}): ${responseText}`,
+    );
+  }
+
+  return { sent: true };
 }
 
 export default async function handler(req, res) {
@@ -108,8 +208,10 @@ export default async function handler(req, res) {
     try {
       const blobInfo = await persistLogEntry(invalidEntry, 'invalid-json');
       console.error('[logger] blob persisted', blobInfo);
+      const emailInfo = await sendErrorEmail(invalidEntry, blobInfo);
+      console.error('[logger] email result', emailInfo);
     } catch (blobError) {
-      console.error('[logger] blob write failed', blobError);
+      console.error('[logger] invalid payload handling failed', blobError);
     }
 
     return res.status(400).json({ ok: false, error: 'Invalid JSON payload' });
@@ -127,6 +229,12 @@ export default async function handler(req, res) {
   try {
     const blobInfo = await persistLogEntry(entry, 'request');
     console.log('[logger] blob persisted', blobInfo);
+    try {
+      const emailInfo = await sendErrorEmail(entry, blobInfo);
+      console.log('[logger] email result', emailInfo);
+    } catch (emailError) {
+      console.error('[logger] email send failed', emailError);
+    }
   } catch (error) {
     console.error('[logger] blob write failed', error);
     return res.status(500).json({ ok: false, error: 'Failed to persist log' });
